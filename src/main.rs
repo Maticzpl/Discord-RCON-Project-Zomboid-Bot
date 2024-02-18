@@ -107,15 +107,15 @@ async fn event_handler(
         serenity::FullEvent::Ready { data_about_bot, .. } => {
             println!("Logged in as {}", data_about_bot.user.name);
 
-            ctx.set_presence(Some(
-                serenity::ActivityData { 
-                    name: "TEST".to_owned(), 
-                    kind: serenity::ActivityType::Playing, 
-                    state: None, 
-                    url: None 
-                }), 
-                serenity::OnlineStatus::Online
-            );
+            // ctx.set_presence(Some(
+            //     serenity::ActivityData { 
+            //         name: "TEST".to_owned(), 
+            //         kind: serenity::ActivityType::Playing, 
+            //         state: None, 
+            //         url: None 
+            //     }), 
+            //     serenity::OnlineStatus::Online
+            // );
         },
         _ => {}
     }
