@@ -1,5 +1,4 @@
-# Discord RCON bot
-## WORK IN PROGRESS! Don't use!
+# Project Zomboid Discord RCON bot
 
 Intended for use in kubernetes
 ```yaml
@@ -11,31 +10,41 @@ data:
   config.json: |
     {
         "token": "DISCORD BOT TOKEN",
-        "admin_role_id": DISCORD ROLE ID FOR PERMISSION TO USE,
+        "admin_role_id": ADMIN ROLE ID FOR EXECUTING RCON COMMANDS,
+        "player_log_channel_id": CHANNEL ID FOR PLAYER JOIN / LEAVE MESSAGES,
         "rcon": {
-            "address": "SERVICE ADDRESS",
+            "address": "SERVER ADRESS",
             "port": "27015",
-            "password": "PASSWORD"
+            "password": "RCON PASSWORD"
         }
     }
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: discord-rcon-bot
+  name: discord-bot-extension
   namespace: project-zomboid
 spec:
-  containers:
-  - name: discord-rcon-bot-container
-    image: maticzpl/discord-rcon-bot
-    volumeMounts:
-    - name: config-volume
-      mountPath: /config.json
-      subPath: config.json
-  volumes:
-  - name: config-volume
-    configMap:
-      name: bot-config
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discord-bot-extension
+  template:
+    metadata:
+      labels:
+        app: discord-bot-extension
+    spec:
+      containers:
+      - name: discord-bot-container
+        image: maticzpl/discord-pz-bot
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config.json
+          subPath: config.json
+      volumes:
+      - name: config-volume
+        configMap:
+          name: bot-config
 ```
 
 Introduces /execute command

@@ -1,74 +1,49 @@
-use std::process::Command;
+mod data_types;
+mod execute;
+mod player_tracker;
 
-// use rcon_rs::{Client, PacketType};
-use rcon::{Connection, AsyncStdStream};
-use poise::serenity_prelude::{self as serenity};
-use serde::{Serialize, Deserialize};
+use std::sync::Arc;
+
+use data_types::Error;
+use poise::serenity_prelude::{self as serenity, ChannelId};
+use rcon::{AsyncStdStream, Connection};
 use tokio::{fs, sync::Mutex};
 
-#[derive(Serialize, Deserialize)]
-struct Config {
-    token: String,
-    admin_role_id: u64,
-    rcon: ConfigRcon
-}
-
-#[derive(Serialize, Deserialize)]
-struct ConfigRcon {
-    address: String,
-    port: String,
-    password: String
-}
-
-struct Data {
-    config: Config,
-    rcon: Mutex<Connection<AsyncStdStream>>
-} 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
-
-#[poise::command(slash_command)]
-async fn execute(
-    ctx: Context<'_>,
-    cmd: String
-) -> Result<(), Error> {
-    let u = ctx.author();
-    if !u.has_role(ctx, ctx.guild_id().unwrap(), ctx.data().config.admin_role_id).await? {
-        return Ok(());
-    }
-   
-
-    let mut rcon = ctx.data().rcon.lock().await; 
-    match rcon.cmd(&cmd).await {
-        Ok(response) => {
-            ctx.say(format!("Command response: {}", response)).await?;
-        },
-        Err(error) => {
-            ctx.say(format!("Command error: {}", error)).await?;
-        }
-    }
-
-    // let mut kubecli = Command::new("sh");
-    // kubecli.args(["-c", "kubectl config set-context --current --namespace=project-zomboid && kubectl rollout restart deploy/pz-server"]);
-    // kubecli.output()?;
-
-    Ok(())
-}
+use crate::data_types::{Config, Data};
+use crate::execute::execute;
+use crate::player_tracker::{PlayerTrackingData, check_players};
 
 
 #[tokio::main]
 async fn main() {
-    let config: Config = serde_json::from_str(     
-            &fs::read_to_string("./config.json").await
-            .expect("Can't find config.json")
-        ).expect("Parsing config.json failed");
+    let config: Config = serde_json::from_str(
+        &fs::read_to_string("./config.json")
+            .await
+            .expect("Can't find config.json"),
+    )
+    .expect("Parsing config.json failed");
 
-    println!("Connecting to rcon");
+    println!("Connecting to RCON");
     let rcon = <Connection<AsyncStdStream>>::builder()
-        .connect(format!("{}:{}", &config.rcon.address, &config.rcon.port), &config.rcon.password)
-        .await.expect("RCON Connection failed");
+        .connect(
+            format!("{}:{}", &config.rcon.address, &config.rcon.port),
+            &config.rcon.password,
+        )
+        .await
+        .expect("RCON Connection failed");
 
-    let data: Data = Data { config, rcon: Mutex::new(rcon) };
+    let rcon = Arc::new(Mutex::new(rcon));
+
+    let player_tracker = Arc::new(Mutex::new(PlayerTrackingData {
+        previous_player_list: vec![],
+        first: true,
+    }));
+
+    let data: Data = Data {
+        config,
+        rcon: rcon.clone(),
+        player_tracker,
+    };
 
     let token = data.config.token.clone();
     let intents = serenity::GatewayIntents::non_privileged();
@@ -96,27 +71,46 @@ async fn main() {
     client.unwrap().start().await.unwrap();
 }
 
+
+
 async fn event_handler(
     ctx: &serenity::Context,
     event: &serenity::FullEvent,
     _framework: poise::FrameworkContext<'_, Data, Error>,
-    _data: &Data,
+    data: &Data,
 ) -> Result<(), Error> {
     #[allow(clippy::single_match)]
     match event {
         serenity::FullEvent::Ready { data_about_bot, .. } => {
-            println!("Logged in as {}", data_about_bot.user.name);
+            println!("Bot logged in as {}", data_about_bot.user.name);
+
+            let cache = ctx.cache.clone();
+            let http = ctx.http.clone();
+            let rcon = data.rcon.clone();
+            let player_tracker = data.player_tracker.clone();
+            let channel_id = data.config.player_log_channel_id;
+
+            tokio::spawn(async move {
+                check_players(
+                    rcon,
+                    player_tracker,
+                    &ChannelId::new(channel_id),
+                    cache,
+                    http,
+                )
+                .await
+            });
 
             // ctx.set_presence(Some(
-            //     serenity::ActivityData { 
-            //         name: "TEST".to_owned(), 
-            //         kind: serenity::ActivityType::Playing, 
-            //         state: None, 
-            //         url: None 
-            //     }), 
+            //     serenity::ActivityData {
+            //         name: "TEST".to_owned(),
+            //         kind: serenity::ActivityType::Playing,
+            //         state: None,
+            //         url: None
+            //     }),
             //     serenity::OnlineStatus::Online
             // );
-        },
+        }
         _ => {}
     }
     Ok(())
