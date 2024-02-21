@@ -1,21 +1,20 @@
 use std::sync::Arc;
 
-use rcon::{AsyncStdStream, Connection};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::PlayerTrackingData;
+use crate::{PlayerTrackingData, rcon_manager::RCONManager};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub token: String,
     pub admin_role_id: u64,
-    pub rcon: ConfigRcon,
+    pub rcon: ConfigRCON,
     pub player_log_channel_id: u64,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct ConfigRcon {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ConfigRCON {
     pub address: String,
     pub port: String,
     pub password: String,
@@ -23,7 +22,7 @@ pub struct ConfigRcon {
 
 pub struct Data {
     pub config: Config,
-    pub rcon: Arc<Mutex<Connection<AsyncStdStream>>>,
+    pub rcon: Arc<Mutex<RCONManager>>,
     pub player_tracker: Arc<Mutex<PlayerTrackingData>>,
 }
 

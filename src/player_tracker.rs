@@ -1,8 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
-use poise::serenity_prelude::{ChannelId, Cache, Http};
-use rcon::{Connection, AsyncStdStream};
+use poise::serenity_prelude::{ChannelId, Cache, Http, Context, ActivityData};
 use tokio::sync::Mutex;
+
+use crate::rcon_manager::RCONManager;
 
 pub struct PlayerTrackingData {
     pub previous_player_list: Vec<String>,
@@ -10,16 +11,17 @@ pub struct PlayerTrackingData {
 }
 
 pub async fn check_players(
-    rcon: Arc<Mutex<Connection<AsyncStdStream>>>,
+    rcon: Arc<Mutex<RCONManager>>,
     player_tracker: Arc<Mutex<PlayerTrackingData>>,
     channel: &ChannelId,
     cache: Arc<Cache>,
     http: Arc<Http>,
+    ctx: Context
 ) {
     loop {
         let mut tracker = player_tracker.lock().await;
 
-        let players = rcon.lock().await.cmd("players").await.unwrap();
+        let players = rcon.lock().await.cmd("players").await;
         let mut player_list: Vec<String> = players.split('\n').map(|s| s.to_string()).collect();
         player_list.remove(0);
         player_list.sort();
@@ -29,6 +31,14 @@ pub async fn check_players(
         player_list.retain(|player| player.trim() != "");
         prev_player_list.retain(|player| player.trim() != "");
 
+        if tracker.first || *prev_player_list != player_list {
+            let suffix = if player_list.len() != 1 { "s" } else { "" } ;
+            let activity = format!("{} player{} online.", player_list.len(), suffix);
+
+            ctx.set_activity(Some(ActivityData::custom(activity)));
+            println!("Player count changed, status changed to show {} players", player_list.len());
+        }
+        
         if !tracker.first && *prev_player_list != player_list {
             let channel = &cache.guilds()[0].channels(&http).await.unwrap()[channel];
 
@@ -41,16 +51,18 @@ pub async fn check_players(
             }
 
             for player in joined_list {
-                channel.say((&cache, http.as_ref()), format!("{} joined", &player[1..]))
+                channel.say((&cache, http.as_ref()), format!("**{} joined**", &player[1..]))
                     .await
                     .unwrap();
+                println!("{} joined", &player[1..]);
             }
 
             for player in &prev_player_list {
                 if let Err(_index) = player_list.binary_search(player) {
-                    channel.say((&cache, http.as_ref()), format!("{} left", &player[1..]))
+                    channel.say((&cache, http.as_ref()), format!("**{} left**", &player[1..]))
                         .await
                         .unwrap();
+                    println!("{} left", &player[1..]);
                 }
             }
         }

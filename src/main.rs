@@ -1,17 +1,18 @@
 mod data_types;
 mod execute;
 mod player_tracker;
+mod rcon_manager;
 
 use std::sync::Arc;
 
 use data_types::Error;
 use poise::serenity_prelude::{self as serenity, ChannelId};
-use rcon::{AsyncStdStream, Connection};
 use tokio::{fs, sync::Mutex};
 
 use crate::data_types::{Config, Data};
 use crate::execute::execute;
 use crate::player_tracker::{PlayerTrackingData, check_players};
+use crate::rcon_manager::RCONManager;
 
 
 #[tokio::main]
@@ -24,13 +25,7 @@ async fn main() {
     .expect("Parsing config.json failed");
 
     println!("Connecting to RCON");
-    let rcon = <Connection<AsyncStdStream>>::builder()
-        .connect(
-            format!("{}:{}", &config.rcon.address, &config.rcon.port),
-            &config.rcon.password,
-        )
-        .await
-        .expect("RCON Connection failed");
+    let rcon = RCONManager::new(config.rcon.clone()).await;
 
     let rcon = Arc::new(Mutex::new(rcon));
 
@@ -86,10 +81,13 @@ async fn event_handler(
 
             let cache = ctx.cache.clone();
             let http = ctx.http.clone();
+            let ctx = ctx.clone(); // pray this is legal
             let rcon = data.rcon.clone();
             let player_tracker = data.player_tracker.clone();
             let channel_id = data.config.player_log_channel_id;
 
+            rcon.lock().await.ctx = Some(ctx.clone());
+            
             tokio::spawn(async move {
                 check_players(
                     rcon,
@@ -97,19 +95,10 @@ async fn event_handler(
                     &ChannelId::new(channel_id),
                     cache,
                     http,
+                    ctx
                 )
                 .await
             });
-
-            // ctx.set_presence(Some(
-            //     serenity::ActivityData {
-            //         name: "TEST".to_owned(),
-            //         kind: serenity::ActivityType::Playing,
-            //         state: None,
-            //         url: None
-            //     }),
-            //     serenity::OnlineStatus::Online
-            // );
         }
         _ => {}
     }

@@ -47,5 +47,6 @@ spec:
           name: bot-config
 ```
 
-Introduces /execute command
-Works alongside built in project zomboid discord bot, can be used with same token.
+Introduces /execute command  
+Logs players leaving and joining to chat  
+Works alongside built in project zomboid discord bot, can be used with same token.  
