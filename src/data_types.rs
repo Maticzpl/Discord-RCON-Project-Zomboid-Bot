@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use crate::{PlayerTrackingData, rcon_manager::RCONManager};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub token: String,
     pub admin_role_id: u64,

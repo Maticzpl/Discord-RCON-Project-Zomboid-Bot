@@ -9,7 +9,8 @@ use crate::data_types::ConfigRCON;
 pub struct RCONManager {
     pub connection: Connection<AsyncStdStream>,
     config: ConfigRCON,
-    pub ctx: Option<poise::serenity_prelude::Context>
+    pub ctx: Option<poise::serenity_prelude::Context>,
+    connection_did_fail: bool
 }
 
 
@@ -26,7 +27,8 @@ impl RCONManager {
                 return RCONManager { 
                     connection,
                     config,
-                    ctx: None
+                    ctx: None,
+                    connection_did_fail: false
                 }    
             }
             println!("Connection not established, retrying...");
@@ -35,12 +37,14 @@ impl RCONManager {
     }
 
     pub async fn cmd(&mut self, command: &str) -> String {
+        self.connection_did_fail = false;
         loop {
             match self.connection.cmd(command).await {
                 Ok(response) => {
                     return response;
                 },
                 Err(_) => {
+                    self.connection_did_fail = true;
                     println!("Connection lost, reconnecting...");
                     if let Some(ctx) = &self.ctx {
                         ctx.set_activity(Some(ActivityData::custom("Server down")));
@@ -72,6 +76,10 @@ impl RCONManager {
 
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
+    }
+
+    pub fn did_connection_fail(&self) -> bool {
+       self.connection_did_fail 
     }
     
 }

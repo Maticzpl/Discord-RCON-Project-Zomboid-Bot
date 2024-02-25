@@ -6,7 +6,7 @@ mod rcon_manager;
 use std::sync::Arc;
 
 use data_types::Error;
-use poise::serenity_prelude::{self as serenity, ChannelId};
+use poise::serenity_prelude::{self as serenity};
 use tokio::{fs, sync::Mutex};
 
 use crate::data_types::{Config, Data};
@@ -72,7 +72,7 @@ async fn event_handler(
     ctx: &serenity::Context,
     event: &serenity::FullEvent,
     _framework: poise::FrameworkContext<'_, Data, Error>,
-    data: &Data,
+    data: &Data
 ) -> Result<(), Error> {
     #[allow(clippy::single_match)]
     match event {
@@ -84,15 +84,16 @@ async fn event_handler(
             let ctx = ctx.clone(); // pray this is legal
             let rcon = data.rcon.clone();
             let player_tracker = data.player_tracker.clone();
-            let channel_id = data.config.player_log_channel_id;
 
             rcon.lock().await.ctx = Some(ctx.clone());
+
+            let config = data.config.clone();
             
             tokio::spawn(async move {
                 check_players(
                     rcon,
                     player_tracker,
-                    &ChannelId::new(channel_id),
+                    &config,
                     cache,
                     http,
                     ctx

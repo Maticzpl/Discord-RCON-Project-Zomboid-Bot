@@ -1,9 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
-use poise::serenity_prelude::{ChannelId, Cache, Http, Context, ActivityData};
+use poise::serenity_prelude::{Cache, Http, Context, ActivityData, ChannelId, EditChannel};
+use serde_json::json;
 use tokio::sync::Mutex;
 
-use crate::rcon_manager::RCONManager;
+use crate::{rcon_manager::RCONManager, data_types::Config};
 
 pub struct PlayerTrackingData {
     pub previous_player_list: Vec<String>,
@@ -13,7 +14,8 @@ pub struct PlayerTrackingData {
 pub async fn check_players(
     rcon: Arc<Mutex<RCONManager>>,
     player_tracker: Arc<Mutex<PlayerTrackingData>>,
-    channel: &ChannelId,
+    // channel: &ChannelId,
+    config: &Config,
     cache: Arc<Cache>,
     http: Arc<Http>,
     ctx: Context
@@ -31,16 +33,34 @@ pub async fn check_players(
         player_list.retain(|player| player.trim() != "");
         prev_player_list.retain(|player| player.trim() != "");
 
-        if tracker.first || *prev_player_list != player_list {
+        if tracker.first || *prev_player_list != player_list || rcon.lock().await.did_connection_fail() {
             let suffix = if player_list.len() != 1 { "s" } else { "" } ;
             let activity = format!("{} player{} online.", player_list.len(), suffix);
 
             ctx.set_activity(Some(ActivityData::custom(activity)));
             println!("Player count changed, status changed to show {} players", player_list.len());
+
+            // if let Some(count_channel) = &config.player_count_channel {
+            //     let id = ChannelId::new(count_channel.id);
+            //
+            //     let name = count_channel.name.replace("$1", &player_list.len().to_string()).replace("$2", suffix);
+            //     let map = json!({
+            //         "name": name 
+            //     });
+            //     println!("Updating channel name to: {}", name);
+            //
+            //     let httpc = http.clone();
+            //     tokio::spawn(async move { // rate limit bruh
+            //         httpc.edit_channel(id, &map, None).await.unwrap();
+            //         println!("Channel name updated");
+            //     });
+            // }
+
         }
         
         if !tracker.first && *prev_player_list != player_list {
-            let channel = &cache.guilds()[0].channels(&http).await.unwrap()[channel];
+            let id: ChannelId = ChannelId::new(config.player_log_channel_id);
+            let channel = &cache.guilds()[0].channels(&http).await.unwrap()[&id];
 
             let mut joined_list = player_list.clone();
 
