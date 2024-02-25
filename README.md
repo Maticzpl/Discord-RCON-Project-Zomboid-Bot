@@ -12,6 +12,10 @@ data:
         "token": "DISCORD BOT TOKEN",
         "admin_role_id": ADMIN ROLE ID FOR EXECUTING RCON COMMANDS,
         "player_log_channel_id": CHANNEL ID FOR PLAYER JOIN / LEAVE MESSAGES,
+        "player_count_channel": { OPTIONAL
+            "id": CHANNEL ID FOR PLAYER COUNT IN NAME,
+            "name": "$1 player$2 online" $1 IS COUNT, $2 IS "s" SUFFIX
+        },
         "rcon": {
             "address": "SERVER ADRESS",
             "port": "27015",

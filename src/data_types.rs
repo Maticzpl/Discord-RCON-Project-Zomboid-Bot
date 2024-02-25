@@ -11,6 +11,13 @@ pub struct Config {
     pub admin_role_id: u64,
     pub rcon: ConfigRCON,
     pub player_log_channel_id: u64,
+    pub player_count_channel: Option<ConfigPlayerCountChannel>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ConfigPlayerCountChannel {
+    pub id: u64,
+    pub name: String
 }
 
 #[derive(Serialize, Deserialize, Clone)]

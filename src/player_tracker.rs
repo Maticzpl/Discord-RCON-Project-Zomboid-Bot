@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
-use poise::serenity_prelude::{Cache, Http, Context, ActivityData, ChannelId, EditChannel};
+use poise::serenity_prelude::{Cache, Http, Context, ActivityData, ChannelId};
 use serde_json::json;
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time::{timeout, Instant}};
 
 use crate::{rcon_manager::RCONManager, data_types::Config};
 
@@ -20,6 +20,8 @@ pub async fn check_players(
     http: Arc<Http>,
     ctx: Context
 ) {
+    let mut last_update = Instant::now();
+
     loop {
         let mut tracker = player_tracker.lock().await;
 
@@ -33,28 +35,35 @@ pub async fn check_players(
         player_list.retain(|player| player.trim() != "");
         prev_player_list.retain(|player| player.trim() != "");
 
-        if tracker.first || *prev_player_list != player_list || rcon.lock().await.did_connection_fail() {
+        if tracker.first || *prev_player_list != player_list || 
+            rcon.lock().await.did_connection_fail() || last_update.elapsed() > Duration::from_secs(60 * 5) {
+            last_update = Instant::now();
+
             let suffix = if player_list.len() != 1 { "s" } else { "" } ;
             let activity = format!("{} player{} online.", player_list.len(), suffix);
 
             ctx.set_activity(Some(ActivityData::custom(activity)));
-            println!("Player count changed, status changed to show {} players", player_list.len());
+            println!("Status changed to show {} players", player_list.len());
 
-            // if let Some(count_channel) = &config.player_count_channel {
-            //     let id = ChannelId::new(count_channel.id);
-            //
-            //     let name = count_channel.name.replace("$1", &player_list.len().to_string()).replace("$2", suffix);
-            //     let map = json!({
-            //         "name": name 
-            //     });
-            //     println!("Updating channel name to: {}", name);
-            //
-            //     let httpc = http.clone();
-            //     tokio::spawn(async move { // rate limit bruh
-            //         httpc.edit_channel(id, &map, None).await.unwrap();
-            //         println!("Channel name updated");
-            //     });
-            // }
+            if let Some(count_channel) = &config.player_count_channel {
+                let id = ChannelId::new(count_channel.id);
+
+                let name = count_channel.name.replace("$1", &player_list.len().to_string()).replace("$2", suffix);
+                let map = json!({
+                    "name": name 
+                });
+                println!("Trying channel name update to: {}", name);
+
+                let http = http.clone();
+                let try_rename = timeout(Duration::from_secs(10), async {
+                    http.edit_channel(id, &map, None).await.unwrap();
+                    println!("Channel name updated");
+                }).await;
+
+                if try_rename.is_err() {
+                    println!("Channel rename failed");
+                }
+            }
 
         }
         
