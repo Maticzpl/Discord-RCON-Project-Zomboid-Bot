@@ -1,7 +1,7 @@
 mod data_types;
-mod execute;
 mod player_tracker;
 mod rcon_manager;
+mod commands;
 
 use std::sync::Arc;
 
@@ -10,7 +10,8 @@ use poise::serenity_prelude::{self as serenity};
 use tokio::{fs, sync::Mutex};
 
 use crate::data_types::{Config, Data};
-use crate::execute::execute;
+use crate::commands::execute::execute;
+use crate::commands::logs::logs;
 use crate::player_tracker::{PlayerTrackingData, check_players};
 use crate::rcon_manager::RCONManager;
 
@@ -45,7 +46,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![execute()],
+            commands: vec![execute(), logs()],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
             },

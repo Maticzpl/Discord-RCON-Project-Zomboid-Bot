@@ -1,0 +1,7 @@
+utlility message function that splits message into multiple if over char limit + allows for invisible to other users (ephemeral) messages
+interface with game logs besidees command
+fix channel rename?????? idk why its broken in prod
+autocomplete rcon commands
+optional regex in logs
+
+refactor some stuff in player tracker maybe

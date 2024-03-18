@@ -36,7 +36,7 @@ pub async fn check_players(
         prev_player_list.retain(|player| player.trim() != "");
 
         if tracker.first || *prev_player_list != player_list || 
-            rcon.lock().await.did_connection_fail() || last_update.elapsed() > Duration::from_secs(60 * 5) {
+            rcon.lock().await.did_connection_fail() || last_update.elapsed() > Duration::from_secs(60) {
             last_update = Instant::now();
 
             let suffix = if player_list.len() != 1 { "s" } else { "" } ;
