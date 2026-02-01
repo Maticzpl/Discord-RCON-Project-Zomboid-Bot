@@ -39,7 +39,7 @@ pub async fn check_players(
             rcon.lock().await.did_connection_fail() || last_update.elapsed() > Duration::from_secs(60 * 5) {
             last_update = Instant::now();
 
-            let suffix = if player_list.len() != 1 { "s" } else { "" } ;
+            let suffix = if player_list.len() != 1 { "ꜱ" } else { "" } ;
             let activity = format!("{} player{} online.", player_list.len(), suffix);
 
             ctx.set_activity(Some(ActivityData::custom(activity)));
