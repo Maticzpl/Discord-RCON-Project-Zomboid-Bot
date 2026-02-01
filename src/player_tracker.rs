@@ -21,6 +21,7 @@ pub async fn check_players(
     ctx: Context
 ) {
     let mut last_update = Instant::now();
+    let mut conn_failed_previously = false;
 
     loop {
         let mut tracker = player_tracker.lock().await;
@@ -35,12 +36,15 @@ pub async fn check_players(
         player_list.retain(|player| player.trim() != "");
         prev_player_list.retain(|player| player.trim() != "");
 
+        let conn_failed = rcon.lock().await.did_connection_fail();
+
         if tracker.first || *prev_player_list != player_list || 
             rcon.lock().await.did_connection_fail() || last_update.elapsed() > Duration::from_secs(60 * 5) {
             last_update = Instant::now();
 
             let suffix = if player_list.len() != 1 { "ꜱ" } else { "" } ;
-            let activity = format!("{} player{} online.", player_list.len(), suffix);
+            let suffix_activity = if player_list.len() != 1 { "s" } else { "" } ;
+            let activity = format!("{} player{} online.", player_list.len(), suffix_activity);
 
             ctx.set_activity(Some(ActivityData::custom(activity)));
             println!("Status changed to show {} players", player_list.len());
@@ -66,36 +70,46 @@ pub async fn check_players(
             }
 
         }
-        
-        if !tracker.first && *prev_player_list != player_list {
+
+        if !tracker.first {
             let id: ChannelId = ChannelId::new(config.player_log_channel_id);
             let channel = &cache.guilds()[0].channels(&http).await.unwrap()[&id];
 
-            let mut joined_list = player_list.clone();
-
-            for player in &prev_player_list {
-                if let Ok(index) = joined_list.binary_search(player) {
-                    joined_list.remove(index);
-                }
-            }
-
-            for player in joined_list {
-                channel.say((&cache, http.as_ref()), format!("**{} joined**", &player[1..]))
+            if !conn_failed && conn_failed_previously {
+                channel.say((&cache, http.as_ref()), "**Server started**")
                     .await
                     .unwrap();
-                println!("{} joined", &player[1..]);
+                println!("Sent server started message");
             }
 
-            for player in &prev_player_list {
-                if let Err(_index) = player_list.binary_search(player) {
-                    channel.say((&cache, http.as_ref()), format!("**{} left**", &player[1..]))
+            if *prev_player_list != player_list {
+                let mut joined_list = player_list.clone();
+
+                for player in &prev_player_list {
+                    if let Ok(index) = joined_list.binary_search(player) {
+                        joined_list.remove(index);
+                    }
+                }
+
+                for player in joined_list {
+                    channel.say((&cache, http.as_ref()), format!("**{} joined**", &player[1..]))
                         .await
                         .unwrap();
-                    println!("{} left", &player[1..]);
+                    println!("{} joined", &player[1..]);
+                }
+
+                for player in &prev_player_list {
+                    if let Err(_index) = player_list.binary_search(player) {
+                        channel.say((&cache, http.as_ref()), format!("**{} left**", &player[1..]))
+                            .await
+                            .unwrap();
+                        println!("{} left", &player[1..]);
+                    }
                 }
             }
         }
 
+        conn_failed_previously = conn_failed;
         tracker.previous_player_list = player_list;
         tracker.first = false;
 

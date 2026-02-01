@@ -8,6 +8,7 @@ use std::sync::Arc;
 use data_types::Error;
 use poise::serenity_prelude::{self as serenity};
 use tokio::{fs, sync::Mutex};
+use tokio_cron_scheduler::{JobScheduler, Job};
 
 use crate::data_types::{Config, Data};
 use crate::execute::execute;
@@ -24,6 +25,7 @@ async fn main() {
     )
     .expect("Parsing config.json failed");
 
+    let scheduler = JobScheduler::new().await.expect("Creating periodic task scheduler failed");
     println!("Connecting to RCON");
     let rcon = RCONManager::new(config.rcon.clone()).await;
 
@@ -33,6 +35,42 @@ async fn main() {
         previous_player_list: vec![],
         first: true,
     }));
+
+    for task in config.tasks.clone() {
+        let task_rcon = rcon.clone();
+        let name = task.name.clone();
+        scheduler.add(
+            Job::new_async(task.cron_time.clone(), move |_uuid, _lock| {
+                let task_rcon = task_rcon.clone();
+                let cmds = task.commands.clone();
+                let name = task.name.clone();
+                let timeout = task.timeout_minutes;
+                Box::pin(async move {
+                    println!("Started task {}", name);
+                    let task_rcon = tokio::time::timeout(
+                        tokio::time::Duration::from_mins(timeout),
+                        task_rcon.lock()
+                    ).await;
+
+                    if task_rcon.is_err() {
+                        println!("Task '{}' timed out", &name);
+                        return
+                    }
+                    let mut task_rcon = task_rcon.unwrap();
+
+                    println!("  RCON lock acquired for {}", &name);
+                    for command in &cmds {
+                        println!("  Running {}", command);
+                        match task_rcon.connection.cmd(command).await {
+                            Ok(resp) => println!("  {}", resp.replace("\n", "\n  ")),
+                            Err(err) => println!("  Command failed: {}", err),
+                        }
+                    }
+                })
+            }).expect("Creating periodic task failed")
+        ).await.expect("Failed to add periodic task");
+        println!("Found task '{}'", &name);
+    }
 
     let data: Data = Data {
         config,
@@ -62,6 +100,8 @@ async fn main() {
     let client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .await;
+
+    scheduler.start().await.expect("Starting scheduler failed");
 
     client.unwrap().start().await.unwrap();
 }

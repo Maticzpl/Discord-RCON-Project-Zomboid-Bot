@@ -17,10 +17,18 @@ data:
             "name": "$1 player$2 online" $1 IS COUNT, $2 IS "s" SUFFIX
         },
         "rcon": {
-            "address": "SERVER ADRESS",
+            "address": "SERVER ADDRESS",
             "port": "27015",
             "password": "RCON PASSWORD"
-        }
+        },
+        "tasks": [
+            {
+                "name": "Restart",
+                "cron_time": "0 */3 * * * *",
+                "timeout_minutes": 60,
+                "commands": [ "quit" ]
+            }
+        ]
     }
 ---
 apiVersion: apps/v1

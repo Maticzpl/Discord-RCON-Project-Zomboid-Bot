@@ -12,6 +12,15 @@ pub struct Config {
     pub rcon: ConfigRCON,
     pub player_log_channel_id: u64,
     pub player_count_channel: Option<ConfigPlayerCountChannel>,
+    pub tasks: Vec<PeriodicTask>
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PeriodicTask {
+    pub name: String,
+    pub cron_time: String,
+    pub timeout_minutes: u64,
+    pub commands: Vec<String>
 }
 
 #[derive(Serialize, Deserialize, Clone)]

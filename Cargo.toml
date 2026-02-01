@@ -9,6 +9,7 @@ edition = "2021"
 # serenity = "0.12.0"
 poise = "0.6.1"
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
+tokio-cron-scheduler = "0.15"
 serde_json = "1.0.113"
 serde = "1.0.196"
 # rcon-rs = "0.1.0"
